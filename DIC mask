@@ -1,0 +1,47 @@
+# DIC mask
+from PIL import Image, ImageDraw
+import matplotlib.pyplot as plt
+
+def create_custom_mask(width, height, rect_params_list, small_rect_params, circle_params_list):
+    mask = Image.new("RGB", (width, height), "black")
+    draw = ImageDraw.Draw(mask)
+    
+    for rect_params in rect_params_list:
+        rect_x1 = rect_params['x']
+        rect_y1 = rect_params['y']
+        rect_x2 = rect_x1 + rect_params['width']
+        rect_y2 = rect_y1 + rect_params['height']
+        draw.rectangle([rect_x1, rect_y1, rect_x2, rect_y2], fill="white")
+    
+    small_rect_x1 = small_rect_params['x']
+    small_rect_y1 = small_rect_params['y']
+    small_rect_x2 = small_rect_x1 + small_rect_params['width']
+    small_rect_y2 = small_rect_y1 + small_rect_params['height']
+    draw.rectangle([small_rect_x1, small_rect_y1, small_rect_x2, small_rect_y2], fill="black")
+
+    for circle_params in circle_params_list:
+        circle_x1 = circle_params['x']
+        circle_y1 = circle_params['y']
+        circle_x2 = circle_x1 + circle_params['diameter']
+        circle_y2 = circle_y1 + circle_params['diameter']
+        draw.ellipse([circle_x1, circle_y1, circle_x2, circle_y2], fill="black")
+
+    return mask
+
+circle_params_list = [
+    {'x':  , 'y':  , 'diameter':  },  
+    {'x':  , 'y':  , 'diameter':  }   
+]
+
+custom_mask = create_custom_mask(
+    1920, 1080,
+    [{'x':  , 'y':  , 'width':  , 'height':  },
+     {'x':  , 'y':  , 'width':  , 'height':  }], 
+    {'x':  , 'y': , 'width': , 'height':  },      
+    circle_params_list                                      
+)
+custom_mask.save('your_folder_path')
+
+plt.imshow(custom_mask)
+plt.axis('off')
+plt.show()
