@@ -1,0 +1,47 @@
+# MATLAB code
+clear all
+%yy
+files_mat = dir('your_folder_path')
+
+for j = 1:length(files_mat)
+    file_name = files_mat(j).name;
+    [~,name]=fileparts(file_name);
+    data_load=load(files_mat(j).name);
+    length_frame = length(data_load.current_save);
+    eyy_path = 'your_folder_path'
+    exx_path = 'your_folder_path'
+    exy_path = 'your_folder_path'
+    u_path = 'your_folder_path'
+    v_path = 'your_folder_path'
+    cor_coeff_path = 'your_folder_path'
+    mkdir(eyy_path,name)
+    mkdir(exx_path,name)
+    mkdir(exy_path,name)
+    mkdir(u_path,name)
+    mkdir(v_path,name)
+    mkdir(cor_coeff_path,name)
+    for i=1:length_frame
+        eyy=data_load.data_dic_save.strains(i).plot_eyy_ref_formatted;
+        exx=data_load.data_dic_save.strains(i).plot_exx_ref_formatted;
+        exy=data_load.data_dic_save.strains(i).plot_exy_ref_formatted;
+        u = data_load.data_dic_save.displacements(i).plot_u_ref_formatted;
+        v = data_load.data_dic_save.displacements(i).plot_v_ref_formatted;
+        corr_coeff=data_load.data_dic_save.displacements(i).plot_corrcoef_dic;
+       
+        filename_eyy = fullfile(eyy_path, name)
+        filename_exx = fullfile(exx_path, name)
+        filename_exy = fullfile(exy_path, name)
+        filename_u = fullfile(u_path, name)
+        filename_v = fullfile(v_path, name)
+        filename_corr_coeff = fullfile(cor_coeff_path, name)
+        
+        save([filename_eyy '\eyy_' num2str(i-1) '.mat'],'eyy')
+        save([filename_exx '\exx_' num2str(i-1) '.mat'],'exx')
+        save([filename_exy '\exy_' num2str(i-1) '.mat'],'exy')
+        save([filename_u '\u_' num2str(i-1) '.mat'],'u')
+        save([filename_v '\v_' num2str(i-1) '.mat'],'v')
+        save([filename_corr_coeff '\corr_coeff_' num2str(i-1) '.mat'],'corr_coeff')
+        
+    end
+        
+end
