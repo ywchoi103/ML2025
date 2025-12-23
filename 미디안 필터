@@ -1,0 +1,27 @@
+# 미디안 필터
+import os
+import glob
+import cv2
+from skimage.morphology import disk
+from skimage.filters import median
+
+base_input_path = 'your_folder_path'
+base_output_path = 'your_folder_path'
+
+for i in range(190, 55, -5):
+    folder_name = f'{i//10}_{i%10}' 
+    current_input_path = os.path.join(base_input_path, folder_name)   
+   
+    current_output_path = os.path.join(base_output_path, folder_name)
+    if not os.path.exists(current_output_path):
+        os.makedirs(current_output_path)    
+    
+    for file in glob.glob(current_input_path + '/*.jpg'):       
+        img = cv2.imread(file, 0)        
+        
+        selem = disk( ) 
+        median_img = median(img, selem)        
+        
+        filename = os.path.basename(file) 
+        output_filename = os.path.join(current_output_path, 'median_' + filename)
+        cv2.imwrite(output_filename, median_img)
