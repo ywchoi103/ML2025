@@ -1,0 +1,38 @@
+# 동영상에서 이미지 추출
+import cv2
+import os
+video_path = 'your_folder_path'
+
+frame_capture_ratio = 
+
+output_directory = 'your_folder_path'
+video = cv2.VideoCapture(video_path)
+
+frame_count = 0
+frame_saved = 0
+
+if not video.isOpened():
+    print("Could not open video!")
+    exit()
+
+os.makedirs(output_directory, exist_ok=True)
+
+while video.isOpened():
+    ret, frame = video.read()
+
+    if not ret:
+        print("End of video.")
+        break
+
+    frame_count += 1
+
+    if frame_count % frame_capture_ratio == 0:        
+        resized_frame = cv2.resize(frame, (1920, 1080))
+        
+        output_filename = f"image_{frame_saved:04d}.jpg"
+        output_filepath = os.path.join(output_directory, output_filename)
+        cv2.imwrite(output_filepath, resized_frame)
+        frame_saved += 1
+        print(f"Captured frame {frame_saved} as {output_filepath}")
+
+video.release()
