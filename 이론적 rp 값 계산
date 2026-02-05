@@ -1,0 +1,8 @@
+# 이론적 rp 값 계산
+σYS = 
+
+rpmax = (1 / math.pi)*(Kmax / σYS)**2
+rpmin = (1 / math.pi)*(Kmin / σYS)**2
+
+print("rpmax 값", rpmax)
+print("rpmin 값", rpmin)
