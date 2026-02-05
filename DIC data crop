@@ -1,0 +1,55 @@
+# DIC data crop
+import scipy.io as sio
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+from glob import glob
+from matplotlib.ticker import ScalarFormatter
+
+def plot_contour_from_mat(file_path, vmin, vmax, output_dir, hide_axes=False, colorbar_shrink=1.0, show_colorbar=True):
+    mat_data = sio.loadmat(file_path)
+    
+    data_key = 'eyy' 
+    if data_key not in mat_data:
+        raise KeyError(f"'{data_key}' not found in MAT file.")
+    data = mat_data[data_key]
+    
+    plt.figure()
+    contour = plt.contourf(data, cmap='jet', levels=np.linspace(vmin, vmax, 100), extend='both')
+    
+    if show_colorbar:
+        cbar = plt.colorbar(contour, shrink=colorbar_shrink)
+        formatter = ScalarFormatter(useMathText=True)
+        formatter.set_powerlimits((-3, 3))
+        cbar.ax.yaxis.set_major_formatter(formatter)
+        
+        cbar.ax.tick_params(labelsize=13)  # 눈금 라벨의 크기를 지정
+        cbar.set_label('Strain', fontweight='bold', fontsize=14)
+        cbar.ax.yaxis.offsetText.set_fontsize(12)  
+        cbar.ax.yaxis.offsetText.set_position((4,0)) 
+
+    if hide_axes:
+        plt.axis('off')
+    else:
+        plt.xlabel('X Axis', fontweight='bold', fontsize=14)  
+        plt.ylabel('Y Axis', fontweight='bold', fontsize=14)  
+
+    file_name = os.path.basename(file_path).replace('.mat', '.png')
+    output_path = os.path.join(output_dir, file_name)
+    plt.savefig(output_path, bbox_inches='tight', pad_inches=0)
+    plt.close()
+
+mat_folder = r'your_folder_path/'
+output_dir = r'your_folder_path/'  
+vmin = 
+vmax = 
+hide_axes = True  
+colorbar_shrink = 0.8  
+show_colorbar = False 
+
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
+mat_files = glob(os.path.join(mat_folder, '*.mat'))
+for mat_file in mat_files:
+    plot_contour_from_mat(mat_file, vmin, vmax, output_dir, hide_axes, colorbar_shrink, show_colorbar)
