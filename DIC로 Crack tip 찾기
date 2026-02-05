@@ -1,0 +1,37 @@
+# DIC로 Crack tip 찾기
+import os
+import pandas as pd
+from scipy.io import loadmat
+from openpyxl import load_workbook
+from openpyxl.styles import Font
+from openpyxl.formatting.rule import CellIsRule
+from openpyxl.utils import get_column_letter
+
+def convert_mat_to_stress_excel(mat_path, output_dir, E_MPa=70000, yield_strength=480):
+    
+mat_data = loadmat(mat_path)
+    eyy_data = mat_data['eyy']
+    df_eyy = pd.DataFrame(eyy_data)
+
+df_sigma_yy = df_eyy * E_MPa
+
+base_name = os.path.splitext(os.path.basename(mat_path))[0]
+    raw_excel = os.path.join(output_dir, f"{base_name}_stress.xlsx")
+    highlighted_excel = os.path.join(output_dir, f"{base_name}_highlighted.xlsx")
+
+df_sigma_yy.to_excel(raw_excel, index=False)
+
+    wb = load_workbook(raw_excel)
+    ws = wb.active
+    max_row = ws.max_row
+    max_col = ws.max_column
+    end_col_letter = get_column_letter(max_col)
+    cell_range = f"A1:{end_col_letter}{max_row}"
+
+    red_font = Font(color="FF0000")
+    rule = CellIsRule(operator='greaterThan', formula=[str(yield_strength)], stopIfTrue=True, font=red_font)
+    ws.conditional_formatting.add(cell_range, rule)
+
+    wb.save(highlighted_excel)
+
+    return highlighted_excel
