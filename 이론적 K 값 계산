@@ -1,0 +1,21 @@
+# 이론적 K 값 계산
+import math
+
+W = 
+a = 
+Pmax = 
+Pmin = 
+B = 
+
+A = a / W
+
+F = (2 + A) / ((1 - A) ** (3 / 2)) * (0.886 + 4.64 * A - 13.32 * A**2 + 14.72 * A**3 - 5.6 * A**4)
+
+Kmax = Pmax * F / (B * math.sqrt(W)) / 1000000
+Kmin = Pmin * F / (B * math.sqrt(W)) / 1000000
+
+ΔK = Kmax - Kmin
+
+print("Kmax 값:", Kmax)
+print("Kmin 값", Kmin)
+print("ΔK 값:", ΔK)
