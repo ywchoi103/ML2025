@@ -1,0 +1,36 @@
+# DIC data subtraction
+import os
+import numpy as np
+from scipy.io import loadmat, savemat
+
+def subtract_eyy_files(file_max_path, file_min_path, output_path):
+    
+    output_dir = os.path.dirname(output_path)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    data_max = loadmat(file_max_path)
+    data_min = loadmat(file_min_path)
+
+    var_name_max = next((k for k in data_max if not k.startswith("__")), None)
+    var_name_min = next((k for k in data_min if not k.startswith("__")), None)
+
+    if var_name_max is None or var_name_min is None:
+        raise ValueError("하나 이상의 파일에서 유효한 변수를 찾을 수 없습니다.")
+
+    arr_max = data_max[var_name_max]
+    arr_min = data_min[var_name_min]
+
+    if arr_max.shape != arr_min.shape:
+        raise ValueError(f"배열 크기가 다릅니다: {arr_max.shape} vs {arr_min.shape}")
+
+    eyy_diff = arr_max - arr_min
+
+    savemat(output_path, {'eyy_diff': eyy_diff})
+    print(f"eyy subtraction 완료! → 저장: {output_path}")
+
+file_max_path = r'your_folder_path'
+file_min_path = r'your_folder_path'
+output_path = r'your_folder_path'
+
+subtract_eyy_files(file_max_path, file_min_path, output_path)
