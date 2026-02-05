@@ -1,0 +1,36 @@
+# ML intensity field subtraction
+from PIL import Image
+import os
+import matplotlib.pyplot as plt
+import numpy as np
+
+max_img_path = r'your_folder_path'
+min_img_path = r'your_folder_path'
+
+y1, x1, y2, x2 =  ,  ,  ,
+
+user_brightness =
+
+scale_min = 
+scale_max = 
+
+save_path = r'your_folder_path'
+
+img_max = Image.open(max_img_path).convert("L")
+img_min = Image.open(min_img_path).convert("L")
+
+roi_max = img_max.crop((x1, y1, x2, y2))
+roi_min = img_min.crop((x1, y1, x2, y2))
+
+arr_max = np.array(roi_max, dtype=np.float32)
+arr_min = np.array(roi_min, dtype=np.float32)
+
+diff = arr_max - arr_min - user_brightness
+
+plt.figure(figsize=((x2 - x1) / 100, (y2 - y1) / 100))
+plt.axis('off')
+plt.imshow(diff, cmap='jet', vmin=scale_min, vmax=scale_max, aspect='equal', origin='lower')
+plt.savefig(save_path, bbox_inches='tight', pad_inches=0, dpi=130)
+# plt.show()  
+
+print("밝기 차이값 통계 → min:", np.min(diff), "max:", np.max(diff), "mean:", np.mean(diff))
