@@ -1,0 +1,27 @@
+from PIL import Image, ImageDraw
+import matplotlib.pyplot as plt
+
+def create_shifted_square_mask(width, height, ref_x, ref_y, square_size=500):
+    mask = Image.new("RGB", (width, height), "black")
+    draw = ImageDraw.Draw(mask)
+
+    x1 = ref_x - square_size
+    y1 = ref_y
+    x2 = ref_x
+    y2 = ref_y + square_size
+
+    draw.rectangle([x1, y1, x2, y2], fill="white")
+    return mask
+
+img_width = 1920
+img_height = 1080
+ref_x =   # 기준점 x (우측)
+ref_y =  # 기준점 y (상단 기준)
+
+mask_img = create_shifted_square_mask(img_width, img_height, ref_x, ref_y)
+
+mask_img.save(r'your_folder_path')
+
+plt.imshow(mask_img)
+plt.axis('off')
+plt.show()
