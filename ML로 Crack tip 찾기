@@ -1,0 +1,65 @@
+# ML로 Crack tip 찾기
+import cv2
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+
+image_path = r'your_folder_path’
+img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE) 
+
+y1, x1, y2, x2 =  ,  ,  ,    
+roi = img[y1:y2, x1:x2]
+
+stride =2
+window_size = 7
+avg_brightness = []
+brightest_pixel_locs = []
+brightest_pixel_absolute_locs = []
+locations = []
+
+for i in range(0, roi.shape[0] - window_size + 1, stride):
+    for j in range(0, roi.shape[1] - window_size + 1, stride):
+        window = roi[i:i+window_size, j:j+window_size]
+        avg_brightness.append(np.mean(window))
+        brightest_pixel_loc = np.unravel_index(np.argmax(window), window.shape)
+        brightest_pixel_locs.append((i + brightest_pixel_loc[0], j + brightest_pixel_loc[1]))
+        brightest_pixel_absolute_locs.append((y1 + i + brightest_pixel_loc[0], x1 + j + brightest_pixel_loc[1]))
+        locations.append((i, j))
+
+max_brightness_idx = np.argmax(avg_brightness)
+max_loc = locations[max_brightness_idx]
+max_window_avg_brightness = avg_brightness[max_brightness_idx]
+max_brightest_pixel_intensity = np.max(roi[max_loc[0]:max_loc[0]+window_size, max_loc[1]:max_loc[1]+window_size])
+
+df = pd.DataFrame({'brightness': avg_brightness, 
+                   'brightest_pixel_location': brightest_pixel_locs, 
+                   'brightest_pixel_absolute_location': brightest_pixel_absolute_locs})
+
+additional_info = pd.DataFrame({'max_window_avg_brightness': [max_window_avg_brightness], 
+                                'max_brightest_pixel_intensity': [max_brightest_pixel_intensity], 
+                                'max_brightest_pixel_location': [brightest_pixel_locs[max_brightness_idx]], 
+                                'max_brightest_pixel_absolute_location': [brightest_pixel_absolute_locs[max_brightness_idx]]})
+
+with pd.ExcelWriter(r' your_folder_path) as writer:
+    df.to_excel(writer, sheet_name='Brightness Data', index=False)
+  additional_info.to_excel(writer, sheet_name='Max Brightness Info', index=False)
+
+brightest_pixel_loc = tuple(map(int, brightest_pixel_locs[max_brightness_idx]))
+brightest_pixel_absolute_loc = tuple(map(int, brightest_pixel_absolute_locs[max_brightness_idx]))
+
+print("가장 밝은 부분의 윈도우에서 가장 밝은 픽셀 위치: ", brightest_pixel_loc)
+print("가장 밝은 부분의 윈도우에서 가장 밝은 픽셀의 절대 위치: ", brightest_pixel_absolute_loc)
+print("가장 밝은 부분의 윈도우의 평균 밝기: ", max_window_avg_brightness)
+print("가장 밝은 부분의 윈도우에서 가장 밝은 픽셀의 밝기 강도: ", max_brightest_pixel_intensity)
+
+fig, ax = plt.subplots(1, tight_layout=True)  # tight_layout을 True로 설정
+ax.imshow(roi, cmap='gray')
+rect = patches.Rectangle((max_loc[1], max_loc[0]), window_size, window_size, linewidth=1, edgecolor='r', facecolor='none')
+ax.add_patch(rect)
+
+ax.set_xticks([])  
+ax.set_yticks([])  
+
+plt.savefig(r' your_folder_path, bbox_inches='tight', pad_inches=0)
+plt.show()
