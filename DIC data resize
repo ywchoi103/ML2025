@@ -1,0 +1,49 @@
+# DIC data resize
+import cv2
+import numpy as np
+import os
+import scipy.io as sio
+
+def resize_with_interpolation_and_padding(folder_path, output_path, target_size=(1920, 1080)):
+    mat_files = [file for file in os.listdir(folder_path) if file.endswith('.mat')]
+    
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+    
+    for file_name in mat_files:
+        file_path = os.path.join(folder_path, file_name)
+        data = sio.loadmat(file_path)
+        
+        for key in data:
+            if key.startswith('__'):
+                continue
+            
+            array = data[key]
+            if isinstance(array, np.ndarray) and array.ndim == 2:
+                mask = array != 0
+                
+                resized = cv2.resize(array, target_size, interpolation=cv2.INTER_LINEAR)
+                resized_mask = cv2.resize(mask.astype(np.float32), target_size, interpolation=cv2.INTER_NEAREST)
+                
+                kernel = np.ones((3,3), np.uint8)
+                dilated_mask = cv2.dilate(resized_mask, kernel, iterations = 1)
+                border_mask = dilated_mask - resized_mask
+                
+                border_indexes = np.where((border_mask > 0) & (resized == 0))
+                for y, x in zip(*border_indexes):
+                    local_values = resized[max(y-1,0):y+2, max(x-1,0):x+2]
+                    non_zero_values = local_values[local_values != 0]
+                    if non_zero_values.size > 0:
+                        mean_val = np.mean(non_zero_values)
+                        resized[y, x] = mean_val
+                
+                resized[resized_mask == 0] = 0
+                
+                data[key] = resized
+        
+        output_file_path = os.path.join(output_path, file_name)
+        sio.savemat(output_file_path, data)
+
+folder_path = r'your_folder_path'
+output_path = r'your_folder_path'
+resize_with_interpolation_and_padding(folder_path, output_path)
