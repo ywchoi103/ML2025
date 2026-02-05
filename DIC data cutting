@@ -1,0 +1,31 @@
+# DIC data cutting
+import numpy as np
+import scipy.io as sio
+import os
+
+def extract_data_around_point_for_all(folder_path, output_path, point, up=50, down=50, left=50, right=50):
+
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
+    for file_name in os.listdir(folder_path):
+        if file_name.endswith('.mat'):
+            mat_file_path = os.path.join(folder_path, file_name)
+            data = sio.loadmat(mat_file_path)
+            
+            for key in data:
+                if key.startswith('__'):
+                    continue
+                
+                array = data[key]
+                if isinstance(array, np.ndarray) and array.ndim == 2:
+                    y, x = point
+                    extracted_data = array[max(0, y-up):y+down+1, max(0, x-left):x+right+1]
+                   output_file_name = file_name.replace('.mat', '_extracted.mat')
+                    sio.savemat(os.path.join(output_path, output_file_name), {key: extracted_data})
+
+folder_path = r'your_folder_path'
+output_path = r'your_folder_path'  
+point = (y, x) 
+
+extract_data_around_point_for_all(folder_path, output_path, point)
