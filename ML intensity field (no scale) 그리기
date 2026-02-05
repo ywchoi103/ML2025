@@ -1,0 +1,43 @@
+# ML intensity field (no scale) 그리기
+from PIL import Image
+import os
+import matplotlib.pyplot as plt
+import numpy as np
+
+path = r'your_folder_path/'
+
+image_files = [f for f in os.listdir(path) if f.endswith('.jpg') or f.endswith('.png')]
+
+images = [(Image.open(path + image_file), image_file) for image_file in image_files]
+
+y1, x1, y2, x2 = ,  ,  ,
+
+interest_area = [(image.crop((x1, y1, x2, y2)), image_file) for image, image_file in images]
+
+user_brightness = 
+
+scale_min =   
+scale_max =    
+
+save_path = r'your_folder_path/'
+
+if not os.path.exists(save_path):
+    os.makedirs(save_path)
+
+for image, image_file in interest_area:
+    brightness = image.convert("L")
+
+    diff = brightness.point(lambda p: p - user_brightness)
+
+    np_diff = np.array(diff)
+
+    plt.figure(figsize=((x2 - x1) / 100, (y2 - y1) / 100))  
+
+    plt.axis('off')
+
+    plt.imshow(np_diff, cmap='jet', vmin=scale_min, vmax=scale_max, aspect='equal', origin='lower')
+    
+    filename, _ = os.path.splitext(image_file) 
+    plt.savefig(save_path + f'{filename}.png', bbox_inches='tight', pad_inches=0, dpi=130)
+
+    plt.show()
