@@ -1,0 +1,207 @@
+# SIF 구하기
+import mat73
+import scipy
+from scipy import io
+import glob
+import numpy as np
+import h5py
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import os
+import cv2
+from scipy.ndimage import gaussian_filter
+import matplotlib.ticker
+from sklearn.metrics import mean_absolute_error
+import math
+import pandas as pd
+
+folder_path_48_led = r'your_folder_path'
+results_path = r'your_folder_path’
+
+def full_path(folder_path, data_type='v', magnification='dic'):
+    pattern = os.path.join(folder_path, 'strain', data_type, str(magnification), '*mat')
+    file_paths = sorted(glob.glob(pattern), key=os.path.getmtime)
+    return file_paths
+
+sigma =3
+
+def load_mat(path,data_type):
+    data_mat = io.loadmat(path)[data_type]
+    data_mat= np.flip(data_mat, axis=1)
+    width = np.shape(data_mat)[1]
+    height = np.shape(data_mat)[0]
+    mean2 = np.mean(data_mat)
+
+    return data_mat, mean2
+
+frame=0
+
+ox,oy = int(283.5), int(256.0)
+
+th = np.arange(60,-60,-3)
+th_rad = np.deg2rad(th)
+x_near, x_far= 1.523,90
+radius = np.arange(x_near,x_far,2)
+
+index_cor = []
+th_rad_each_point = []
+for i in range(len(radius)):
+
+    for j in range(len(th_rad)):
+        y = int(radius[i]*np.sin(th_rad[j]))
+        x = int(radius[i]*np.cos(th_rad[j]))
+        th_rad_list = th_rad[j]
+        th_rad_each_point.append(th_rad_list)
+        xy = [x,y]
+        index_cor.append(xy)
+
+index_cor_crack_tip_origin = np.array(index_cor)
+th_rad_each_point =np.array(th_rad_each_point)
+
+X_original = ox+(index_cor_crack_tip_origin [:,0])
+Y_original = oy-(index_cor_crack_tip_origin [:,1])
+
+def plot_contour_strain_points(folder_path, data_type='v', magnification='dic'):
+
+    figure_name = full_path(folder_path, data_type, magnification)[frame]
+    read_data = load_mat(figure_name,data_type)[0]
+    fig,ax = plt.subplots(figsize=(2000/100,1400/100),nrows=1,ncols=1)
+    shw = ax.contourf(read_data, 30, cmap='jet')
+    ax.plot(ox,oy,'o',markersize=5, color='k')
+    ax.plot(X_original, Y_original,'o',markersize=5, color='b')
+    plt.axis('on')
+    ax.invert_yaxis()
+    ax.axis('on')
+    ax.set_aspect(aspect=1)
+
+    bar = plt.colorbar(shw)
+
+    fig.show()
+
+
+def plot_contour_dis_points(folder_path, data_type='v', magnification='dic'):
+
+    figure_name = full_path(folder_path, data_type, magnification)[frame]
+    read_data = load_mat(figure_name,data_type)[0]
+    fig,ax = plt.subplots(figsize=(2000/100,1400/100),nrows=1,ncols=1)
+    shw = ax.contourf(read_data, 50, cmap='jet')
+    ax.plot(ox,oy,'o',markersize=5, color='k')
+    ax.plot(X_original, Y_original,'o',markersize=5, color='b')
+
+    plt.axis('on')
+    ax.invert_yaxis()
+    ax.axis('on')
+    ax.set_aspect(aspect=1)
+
+    bar = plt.colorbar(shw)
+
+    fig.show()
+
+plot_contour_dis_points(folder_path_48_led , data_type='v', magnification='dic')
+
+frame_list = len(full_path(folder_path_48_led , data_type='v', magnification='dic'))
+print(frame_list)
+
+KI = []
+KII = []
+eyy_mean =[]
+
+for frame in range(frame_list):
+
+    load_mat_u= load_mat(full_path(folder_path_48_led , data_type='u', magnification='dic')[frame],data_type='u')[0]
+    load_mat_v= load_mat(full_path(folder_path_48_led , data_type='v', magnification='dic')[frame],data_type='v')[0]
+    extract_u = (load_mat_u[Y_original[:],X_original[:]])
+    extract_v = (load_mat_v[Y_original[:],X_original[:]])
+
+
+    n=1
+
+    pix_mm=1/20
+    x_cor = X_original
+    y_cor = Y_original
+    crack_tip_x=ox
+    crack_tip_y=oy
+    x_cor_crack_tip = x_cor-crack_tip_x
+    y_cor_crack_tip = y_cor-crack_tip_y
+    x_cor_crack_tip = x_cor_crack_tip * pix_mm * 10**(-3)
+    y_cor_crack_tip = y_cor_crack_tip * pix_mm * 10**(-3)
+
+    u_dis = (extract_u*pix_mm)  * 10**(-3)
+
+    v_dis = (extract_v*pix_mm) * 10**(-3)
+    
+    Th_rad = th_rad_each_point
+
+    r = (x_cor_crack_tip**2 + y_cor_crack_tip**2)**(1/2)
+
+    v =
+    E = 
+    meu = E/(2*(1+v))
+    X = (3-4*v) #(3-v)/(1+v)
+
+    fI=[]
+    fII = []
+    gI = []
+    gII = []
+
+    for i in range(n):
+        for k in range(len(r)):
+            fI_rt = 1/(2*meu)*r[k]**((i+1)/2)*((X+(i+1)/2+(-1)**n*math.cos((i+1)/2*Th_rad[k])-(i+1)/2*math.cos(((i+1)/2-2)*Th_rad[k])))
+            fII_rt = 1/(2*meu)*r[k]**((i+1)/2)*((X+(i+1)/2-(-1)**n*math.sin((i+1)/2*Th_rad[k])-(i+1)/2*math.sin(((i+1)/2-2)*Th_rad[k])))
+            gI_rt = 1/(2*meu)*r[k]**((i+1)/2)*((X-(i+1)/2-(-1)**n*math.sin((i+1)/2*Th_rad[k])+(i+1)/2*math.sin(((i+1)/2-2)*Th_rad[k])))
+            gII_rt = 1/(2*meu)*r[k]**((i+1)/2)*((-X+(i+1)/2-(-1)**n*math.cos((i+1)/2*Th_rad[k])-(i+1)/2*math.cos(((i+1)/2-2)*Th_rad[k])))
+            fI.append(fI_rt)
+            fII.append(fII_rt)
+            gI.append(gI_rt)
+            gII.append(gII_rt)
+
+    fI_array = np.array(fI)
+
+    fII_array = np.array(fII)
+    gI_array = np.array(gI)
+    gII_array = np.array(gII)
+    fI_reshape = fI_array.reshape((-1,n))
+    fII_reshape = -fII_array.reshape((-1,n))
+    gI_reshape = gI_array.reshape((-1,n))
+    gII_reshape = -gII_array.reshape((-1,n))
+    f_hstack = np.hstack((fI_reshape,fII_reshape))
+    g_hstack = np.hstack((gI_reshape,gII_reshape))
+    f_g_vstack =  np.vstack((f_hstack,g_hstack))
+
+    one_column = np.ones(len(r))
+    zero_column = np.zeros(len(r))
+    one_zero_h_stack = np.hstack((one_column,zero_column))
+    one_zero_h_stack = np.expand_dims( one_zero_h_stack,axis=1)
+    zero_one_h_stack = np.hstack((zero_column,one_column))
+    zero_one_h_stack = np.expand_dims( zero_one_h_stack,axis=1)
+
+    fg_o_z_hstack = np.hstack((f_g_vstack,one_zero_h_stack))
+    fg_o_z_z_o_hstack = np.hstack((fg_o_z_hstack,zero_one_h_stack))
+    y_x_v_stack = np.hstack((-y_cor_crack_tip,x_cor_crack_tip))
+
+    y_x_v_stack = np.expand_dims( y_x_v_stack,axis=1)
+
+    b = np.hstack((fg_o_z_z_o_hstack ,y_x_v_stack))
+
+    h = np.hstack((u_dis,v_dis))
+    results = np.linalg.inv(np.transpose(b) @ b) @ np.transpose(b) @ h
+    pi = math.pi
+    k1 = results[0] * (2*pi)**(1/2) / 10**(6)  
+    k2 = results[n] * (2*pi)**(1/2) / 10**(6)
+    Tx = results[-3] * 10**3
+    Ty = results[-2]* 10**3
+    R = results[-1]
+    KI.append(k1)
+    KII.append(k2)
+    
+
+result_df = pd.DataFrame({'KI':KI,'KII':KII})
+print(result_df)
+
+result_df = pd.DataFrame({'KI':KI, 'KII':KII})
+
+with pd.ExcelWriter(results_path, engine='openpyxl') as writer:
+    result_df.to_excel(writer, sheet_name='Sheet1')
+
+print(f'결과가 성공적으로 저장되었습니다')
+
