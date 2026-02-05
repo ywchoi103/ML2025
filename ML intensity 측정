@@ -1,0 +1,48 @@
+# ML intensity 측정
+import cv2
+import os
+import numpy as np
+import pandas as pd
+
+folder_path = r'your_folder_path’
+
+save_folder_path = r'your_folder_path’
+
+excel_save_path = r'your_folder_path'
+
+if not os.path.exists(save_folder_path):
+    os.makedirs(save_folder_path)
+
+files = os.listdir(folder_path)
+
+roi_coords = (y1, x1, y2, x2)
+
+brightness_data = []
+
+for file_name in files:
+    file_path = os.path.join(folder_path, file_name)
+   
+    if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff')):
+        img = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
+        
+        if img is not None:
+            cv2.rectangle(img, (roi_coords[1], roi_coords[0]), (roi_coords[3], roi_coords[2]), (255, 0, 0), 2)
+            
+            roi = img[roi_coords[0]:roi_coords[2], roi_coords[1]:roi_coords[3]]
+            
+            avg_brightness_roi = np.mean(roi)
+            
+            brightness_data.append({'파일명': file_name, 'ROI 밝기 평균값': avg_brightness_roi})
+
+            save_path = os.path.join(save_folder_path, file_name)
+            cv2.imwrite(save_path, img)
+            
+        else:
+            
+print(f"파일명: {file_name}, 이미지를 불러오는 데 실패했습니다.")
+
+df_brightness = pd.DataFrame(brightness_data)
+
+df_brightness.to_excel(excel_save_path, index=False)
+
+print(f"밝기 평균값이 '{excel_save_path}'에 저장되었습니다.")
