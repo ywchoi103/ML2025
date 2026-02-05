@@ -1,0 +1,188 @@
+import os
+import glob
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from tensorflow.keras.layers import Conv2D, BatchNormalization, Activation, Dense, Input, Concatenate, GlobalAveragePooling2D, Dropout, AveragePooling2D
+from tensorflow.keras.models import Model
+from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.mixed_precision import set_global_policy
+from sklearn.metrics import r2_score
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+import cv2
+from scipy.io import loadmat
+set_global_policy('mixed_float16')
+
+try:
+    tpu = tf.distribute.cluster_resolver.TPUClusterResolver()
+    tf.config.experimental_connect_to_cluster(tpu)
+    tf.tpu.experimental.initialize_tpu_system(tpu)
+    strategy = tf.distribute.TPUStrategy(tpu)
+except ValueError:
+    strategy = tf.distribute.get_strategy()
+
+print("REPLICAS: ", strategy.num_replicas_in_sync)
+
+TRAIN_PATH_1 = 'your_folder_path'
+TRAIN_PATH_2 = 'your_folder_path'
+TEST_PATH = 'your_folder_path'
+EXCEL_FILE_PATH = 'your_folder_path'
+WEIGHTS_SAVE_PATH = 'your_folder_path'
+
+excel_data = pd.read_excel(EXCEL_FILE_PATH)
+deltaK_mapping = {row['image']: row['deltaK'] for _, row in excel_data.iterrows()}
+
+def load_mat_file(file_path, key):
+    mat_data = loadmat(file_path)
+    if key in mat_data:
+        return mat_data[key]
+    else:
+        raise KeyError(f"'{key}' 키가 MATLAB 파일에 존재하지 않습니다. 사용 가능한 키: {list(mat_data.keys())}")
+
+def load_png_file(file_path, target_shape=(128, 128)):  
+    img = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
+    img_resized = cv2.resize(img, target_shape)
+    return (img_resized / 127.5) - 1  
+
+def z_score_normalize(data):
+    mean = np.mean(data)
+    std = np.std(data)
+    return (data - mean) / (std + 1e-7)  
+
+def load_displacement_data_paths(base_path, deltaK_mapping):
+    data_paths = []
+    deltaK_values = []
+    
+    for folder_name in os.listdir(base_path):
+        folder_path = os.path.join(base_path, folder_name)
+        if os.path.isdir(folder_path) and folder_name in deltaK_mapping:
+            u_files = glob.glob(os.path.join(folder_path, 'deltau', '*.mat'))
+            v_files = glob.glob(os.path.join(folder_path, 'deltav', '*.mat'))
+            ml_files = glob.glob(os.path.join(folder_path, 'ml0', '*.png'))
+            
+            for u_file, v_file, ml_file in zip(u_files, v_files, ml_files):
+                data_paths.append((u_file, v_file, ml_file))
+                deltaK_values.append(deltaK_mapping[folder_name])
+    
+    return data_paths, np.array(deltaK_values)
+
+def preprocess_data(data_paths, target_shape=(128, 128)):
+    data = []
+    for u_path, v_path, ml_path in data_paths:
+        u_data = load_mat_file(u_path, 'subtracted_u')
+        u_data_resized = cv2.resize(u_data, target_shape)
+        u_data_normalized = z_score_normalize(u_data_resized)
+        v_data = load_mat_file(v_path, 'subtracted_v')
+        v_data_resized = cv2.resize(v_data, target_shape)
+        v_data_normalized = z_score_normalize(v_data_resized)
+        ml_data = load_png_file(ml_path, target_shape)
+        combined_data = np.stack([u_data_normalized, v_data_normalized, ml_data], axis=-1)
+        data.append(combined_data)
+    return np.array(data)
+
+def dense_block(x, growth_rate, layers_per_block):
+    for _ in range(layers_per_block):
+        conv = BatchNormalization()(x)
+        conv = Activation('relu')(conv)
+        conv = Conv2D(4 * growth_rate, (1, 1), padding='same', kernel_initializer='he_normal')(conv)
+        conv = BatchNormalization()(conv)
+        conv = Activation('relu')(conv)
+        conv = Conv2D(growth_rate, (3, 3), padding='same', kernel_initializer='he_normal')(conv)
+        x = Concatenate()([x, conv])  
+    return x
+
+def transition_layer(x, compression):
+    filters = int(x.shape[-1] * compression)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Conv2D(filters, (1, 1), padding='same', kernel_initializer='he_normal')(x)
+    x = AveragePooling2D((2, 2), strides=(2, 2))(x)
+    return x
+
+def create_densenet_model(input_shape, growth_rate=32, layers_per_block=4, compression=0.5):
+    inputs = Input(shape=input_shape)
+    x = Conv2D(8, (7, 7), strides=(2, 2), padding='same', kernel_initializer='he_normal')(inputs)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = AveragePooling2D((3, 3), strides=(2, 2))(x)
+
+    
+    for _ in range(4):
+        x = dense_block(x, growth_rate, layers_per_block)
+        x = transition_layer(x, compression)
+
+    x = GlobalAveragePooling2D()(x)
+    x = Dense(512, activation='relu')(x)
+    x = Dropout(0.5)(x)
+    outputs = Dense(1, dtype='float32')(x)
+
+    model = Model(inputs, outputs)
+    model.compile(optimizer=Adam(learning_rate=1e-4), loss='mse', metrics=['mae'])
+    return model
+
+train_paths_1, deltaK_values_1 = load_displacement_data_paths(TRAIN_PATH_1, deltaK_mapping)
+train_paths_2, deltaK_values_2 = load_displacement_data_paths(TRAIN_PATH_2, deltaK_mapping)
+test_paths, deltaK_values_test = load_displacement_data_paths(TEST_PATH, deltaK_mapping)
+
+all_train_paths = train_paths_1 + train_paths_2
+all_deltaK_values = np.concatenate([deltaK_values_1, deltaK_values_2])
+
+x_train = preprocess_data(all_train_paths)
+y_train = all_deltaK_values
+
+if len(x_train) == 0 or len(y_train) == 0:
+    raise ValueError("Train data or labels are empty. Check file paths and preprocessing.")
+
+x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size=0.2, random_state=42)
+
+with strategy.scope():
+    input_shape = (128, 128, 3)
+    model = create_densenet_model(input_shape)
+
+checkpoint_cb = ModelCheckpoint(WEIGHTS_SAVE_PATH, save_best_only=True)
+reduce_lr_cb = ReduceLROnPlateau(factor=0.5, patience=5, verbose=1)
+early_stopping_cb = EarlyStopping(patience=50, restore_best_weights=True)
+
+history = model.fit(
+    x_train, y_train,
+    validation_data=(x_val, y_val),
+    epochs=  ,
+    batch_size=  * strategy.num_replicas_in_sync,
+    callbacks=[checkpoint_cb, reduce_lr_cb, early_stopping_cb]
+)
+
+model.load_weights(WEIGHTS_SAVE_PATH)
+x_test = preprocess_data(test_paths)
+y_test = deltaK_values_test
+
+test_loss, test_mae = model.evaluate(x_test, y_test)
+y_pred = model.predict(x_test)
+
+r2 = r2_score(y_test, y_pred)
+print(f"Test Loss: {test_loss}, Test MAE: {test_mae}")
+print(f"R^2 Score: {r2}")
+
+epochs = range(1, len(history.history['mae']) + 1)
+
+plt.figure(figsize=(14, 6))
+
+plt.subplot(1, 2, 1)
+plt.plot(epochs, history.history['mae'], label='Training MAE')
+plt.plot(epochs, history.history['val_mae'], label='Validation MAE')
+plt.title('Mean Absolute Error')
+plt.xlabel('Epochs')
+plt.ylabel('MAE')
+plt.legend()
+
+plt.subplot(1, 2, 2)
+plt.plot(y_test, y_pred, 'o')
+plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], 'r--')
+plt.title('R^2 Score')
+plt.xlabel('Actual')
+plt.ylabel('Predicted')
+plt.text(min(y_test), max(y_test), f'R^2: {r2:.2f}', fontsize=12)
+
+plt.tight_layout()
+plt.show()
